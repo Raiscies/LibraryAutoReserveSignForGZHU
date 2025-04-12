@@ -87,10 +87,10 @@ def load_cookie_cache(path: str) -> dict:
             for line in cookies:
                 line = line.strip().split(None, 1)
                 if len(line) != 2:
-                    logger.warning(f'{line[0]} 的cookie为空')
+                    logger.warning(f'[{line[0]}] cookie为空')
                     continue
                 if not re.fullmatch(uuid_pattern, line[1]):
-                    logger.warning(f'{line[0]}: {line[1]} 不是合法的cookie')
+                    logger.warning(f'[{line[0]}] 不是合法的cookie: {line[1]} ')
                     continue
 
                 # cookie_dict[name] = ic_cookie
@@ -278,13 +278,13 @@ class ZWYT(object):
         登录
         """
         if not force_login and self.cookies['ic-cookie']:
-            logger.info('ic-cookie已存在, 跳过登录')
+            logger.info(f'[{self.name}] ic-cookie已存在, 跳过登录')
             return ReturnCode.LOGIN_SKIPED
-        
+
         try: 
             self.get_login_url()
         except Exception as e:
-            logger.error(f'获取登录url失败: {e}')
+            logger.error(f'[{self.name}] 获取登录url失败: {e}')
             return ReturnCode.GET_LOGIN_URL_FAILED
 
         res = self.rr.get(url=self.urls['login_url'], timeout=60)  # 请求登录url获取一些参数
@@ -405,9 +405,9 @@ class ZWYT(object):
 
         # 4: 已生效的预约
         needStatus = 4
-        logger.info(f'查询正在进行的预约, 当前日期: {current_day:%Y-%m-%d}')
+        logger.info(f'[{self.name}] 查询正在进行的预约, 当前日期: {current_day:%Y-%m-%d}')
         url = self.urls['resvinfo'].format(date=current_day, needStatus=4)
-        # logger.info(f'查询url: {url}')
+        # logger.info(f'[{self.name}] 查询url: {url}')
 
         res = self.rr.get(
             url=url, 
@@ -430,19 +430,19 @@ class ZWYT(object):
                         resv.append(item)
             case 300:
                 # ic-cookie 已失效, 需要重新登录
-                logger.warning(f'{self.name}的ic-cookie已失效, 需要重新登录')
+                logger.warning(f'[{self.name}] ic-cookie已失效, 需要重新登录')
                 return None, ReturnCode.COOKIE_EXPIRED
             case _:
-                logger.error(f'查询失败: {res.get("message")}, 状态码: {code}')
+                logger.error(f'[{self.name}] 查询失败: {res.get("message")}, 状态码: {code}')
                 return None, ReturnCode.FAILED
 
-
-        logger.info(f'查询到{self.name}的预约项: {len(resv)}(未预约)/{res.get("count")}(已生效)')
+        total_resv = res.get("count")
+        logger.info(f'[{self.name}] 查询到预约项: {total_resv - len(resv)}(已预约)/{total_resv}(已生效)')
         if len(resv) == 0:
-            logger.info(f'{self.name} 没有查询到需要签到的预约')
+            logger.info(f'[{self.name}] 没有查询到需要签到的预约')
             return None, ReturnCode.NO_RESERVATION
         elif len(resv) > 1:
-            logger.warning(f'{self.name} 查询到了多个正在进行的预约: {resv}')
+            logger.warning(f'[{self.name}] 查询到了多个正在进行的预约: {resv}')
 
         return resv[0], ReturnCode.SUCCESS
 
@@ -497,15 +497,15 @@ class ZWYT(object):
 
             # 预约成功
             if message == '新增成功':
-                logger.success(f"预约成功: {self.name} 预约了 {devName}: {json_data['resvBeginTime']} ~ {json_data['resvEndTime']}" )
+                logger.success(f"[{self.name}] 预约成功: 预约了 {devName}: {json_data['resvBeginTime']} ~ {json_data['resvEndTime']}" )
 
             # 该时间段有预约了
             elif re.findall('当前时段有预约', message):
-                logger.warning(f"{self.name} 这个时段已经有了预约: {json_data['resvBeginTime']} ~ {json_data['resvEndTime']}")
+                logger.warning(f"[{self.name}] 这个时段已经有了预约: {json_data['resvBeginTime']} ~ {json_data['resvEndTime']}")
 
             # 预约失败---可选择向微信推送预约失败的信息, 比如可以使用 pushplus 平台
             else:
-                logger.error(f"{self.name} 时间段: {json_data['resvBeginTime']} 预约失败 {message}")
+                logger.error(f"[{self.name}] 时间段: {json_data['resvBeginTime']} 预约失败 {message}")
 
     # 签到
     def sign(self, devName: str) -> ReturnCode:
@@ -529,7 +529,7 @@ class ZWYT(object):
 
         # 预约座位的编号不对
         if res1_data.get('data') is None:
-            logger.warning(f"{self.name}" + f"{res1_data.get('message')}")
+            logger.warning(f"[{self.name}] {res1_data.get('message')}")
 
             # 预约的不是当前设备, 则签到对应的座位
             devName = re.findall("-(.*)处", res1_data.get('message'))[0]
@@ -553,15 +553,15 @@ class ZWYT(object):
 
         # 签到成功
         if message == '操作成功':
-            logger.success(f"{self.name} 签到成功--{message}")
+            logger.success(f"[{self.name}] 签到成功--{message}")
             return ReturnCode.SUCCESS
 
         # 已经签到过
         elif message == '用户已签到，请勿重复签到':
-            logger.warning(f'{self.name} {message}')
+            logger.warning(f'[{self.name}] {message}')
             return ReturnCode.ALREADY_SIGNED
 
         # 签到失败
         else:
-            logger.error(f"{self.name}--签到失败--{message}")
+            logger.error(f"[{self.name}] 签到失败--{message}")
             return ReturnCode.FAILED

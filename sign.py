@@ -79,9 +79,6 @@ def main():
                 if retc in (ReturnCode.SUCCESS, ReturnCode.ALREADY_SIGNED, ReturnCode.NO_RESERVATION):
                     break
 
-                # elif retc in (ReturnCode.COOKIE_EXPIRED, ReturnCode.FAILED):
-                #     continue
- 
 
         except Exception as e:
             print(e)
